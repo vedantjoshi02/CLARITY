@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% block breadcrumb %}Resource details{% endblock %}{% block content %}<a class="text-link" href="{% url 'subject_resources' resource.subject_id %}">← {{ resource.subject.name }}</a><div class="page-heading"><div><div class="eyebrow">{{ resource.get_kind_display|upper }}</div><h1>{{ resource.title }}</h1><p>{{ resource.subject.semester.year }} · {{ resource.subject.semester }} · {{ resource.file_format }} file</p></div><a class="button" href="{% url 'download' resource.pk %}">Download resource ↓</a></div><div class="detail-grid"><section class="panel padded"><h2>About this resource</h2><p>{{ resource.description|default:'An academic resource for your examination preparation.' }}</p><p class="muted">Added {{ resource.created_at|date:'d F Y' }}</p><hr><h3>Text preview</h3><p class="muted">Extracted text for quick reading. Download the original file to view its full formatting, animations, and diagrams.</p>{% for chunk in excerpts %}<div class="excerpt"><span class="eyebrow">{% if resource.file_format == 'PPTX' %}SLIDE{% else %}PAGE / SECTION{% endif %} {{ chunk.page }}</span><p>{{ chunk.text }}</p></div>{% empty %}<p>{% if resource.file_format == 'PPT' %}This is a legacy PowerPoint file. Download it to view the slides. For slide text preview and AI search, save it as PPTX and upload it again.{% else %}No text preview is available. Download the original resource file.{% endif %}</p>{% endfor %}</section><aside class="panel padded"><h3>A little help understanding?</h3><p>Explore this subject with your AI study companion.</p><a href="{% url 'assistant' %}" class="button wide">Ask a question ✧</a>{% if not user.is_superuser %}
+<hr>
+<form method="post" action="{% url 'save_resource' resource.pk %}">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="{% if is_saved %}remove{% else %}save{% endif %}">
+  <button class="button outline wide">{% if is_saved %}Remove from My Library{% else %}♡ Save to My Library{% endif %}</button>
+</form>
+{% if resource.file_format == 'PDF' and resource.status == 'ready' %}
+<p class="mt"><a class="text-link" href="{% url 'summary' %}?resource={{ resource.pk }}">Summarize this PDF →</a></p>
+{% endif %}
+{% endif %}{% if user.is_superuser %}<hr><h3>Document controls</h3><p><span class="badge-soft">{{ resource.get_status_display }}</span> {% if resource.approved %}Published{% else %}Awaiting review{% endif %}</p>{% if resource.processing_error %}<div class="notice error">{{ resource.processing_error }}</div>{% endif %}<div class="stack-actions">
+  {% if resource.approved or resource.status != 'pending' %}
+  <form method="post" action="{% if resource.approved %}{% url 'resource_action' resource.pk 'withdraw' %}{% else %}{% url 'resource_action' resource.pk 'publish' %}{% endif %}">
+    {% csrf_token %}
+    <button class="button{% if resource.approved %} outline{% endif %}">{% if resource.approved %}Withdraw publication{% else %}Approve and publish{% endif %}</button>
+  </form>
+  {% else %}
+  <p>Extract the document first to unlock approval.</p>
+  {% endif %}<a href="{% url 'resource_edit' resource.pk %}">Edit metadata / replace file →</a><a href="{% url 'resource_action' resource.pk 'reindex' %}">Reprocess document →</a><a class="danger-link" href="{% url 'resource_action' resource.pk 'delete' %}">Delete resource</a></div>{% endif %}</aside></div>{% endblock %}

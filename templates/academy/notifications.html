@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Notifications · CLARITY{% endblock %}
+{% block breadcrumb %}Notifications{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>Notifications</h1></div>
+<section class="panel padded">
+  {% for notice in page %}
+  <article class="timeline-item">
+    <div class="section-heading">
+      <h2>
+        {% if notice.resource_id %}
+        New {{ notice.resource.get_kind_display|lower }} · <a class="text-link" href="{% url 'resource_detail' notice.resource_id %}">{{ notice.resource.title }}</a>
+        {% else %}{{ notice.title }}{% endif %}
+      </h2>
+      {% if not notice.is_read %}<span class="badge-soft">Unread</span>{% endif %}
+    </div>
+    {% if notice.resource_id %}<p>{{ notice.resource.subject.name }}</p>{% else %}<p>{{ notice.message|linebreaksbr }}</p>{% endif %}
+    <p>{{ notice.created_at|date:'d M Y, H:i' }}</p>
+    {% if not notice.is_read %}
+    <form method="post" action="{% url 'read_notification' notice.pk %}">
+      {% csrf_token %}
+      <button class="button small outline">Mark as read</button>
+    </form>
+    {% endif %}
+  </article>
+  {% empty %}<p>No notifications for your academic year yet.</p>{% endfor %}
+</section>
+{% include 'academy/pagination.html' %}
+{% endblock %}

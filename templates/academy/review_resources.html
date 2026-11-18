@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block breadcrumb %}Resource review{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><h1>Resource review</h1><p>Open a draft to inspect it, extract text if needed, and approve it for publication.</p></div>
+  <a class="button outline" href="{% url 'bulk_resources' %}">Bulk upload</a>
+</div>
+<section class="panel">
+  {% for resource in page %}{% include 'academy/resource_row.html' %}{% empty %}<p class="empty">No resources are awaiting review.</p>{% endfor %}
+</section>
+{% include 'academy/pagination.html' %}
+{% endblock %}

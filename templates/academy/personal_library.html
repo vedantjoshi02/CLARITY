@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}My Library · CLARITY{% endblock %}
+{% block breadcrumb %}My Library{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>My Library</h1></div>
+<nav class="actions mb-3" aria-label="My Library views">
+  <a class="button{% if showing_recent %} outline{% endif %}" href="{% url 'personal_library' %}" {% if not showing_recent %}aria-current="page"{% endif %}>Saved resources</a>
+  <a class="button{% if not showing_recent %} outline{% endif %}" href="{% url 'personal_library' %}?tab=recent" {% if showing_recent %}aria-current="page"{% endif %}>Recently viewed</a>
+</nav>
+<div class="panel">
+  {% for resource in page %}{% include 'academy/resource_row.html' %}{% empty %}
+  <p class="empty">{% if showing_recent %}Resources you open or download will appear here.{% else %}Your saved resources will appear here.{% endif %}</p>
+  {% endfor %}
+</div>
+{% include 'academy/pagination.html' %}
+{% endblock %}

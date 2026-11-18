@@ -1,0 +1,29 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+db.sqlite3
+private_media/
+staticfiles/
+*.log
+.venv-backup-*/
+# Local database and backup files
+db.sqlite3*
+data.json
+*.backup*
+*.bak
+
+# Backup source files
+rag_backup.py
+settings_backup.py
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python and development files
+.pytest_cache/
+.coverage
+.vscode/
+.idea/

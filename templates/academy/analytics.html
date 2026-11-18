@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block breadcrumb %}Analytics{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>Resource and student analytics</h1></div>
+<div class="stats-grid">
+  <article class="stat"><div><strong>{{ active_students }}</strong><p>Active students · last 7 days</p></div></article>
+  <article class="stat"><div><strong>{{ viewing_students }}</strong><p>Students who accessed materials · last 7 days</p></div></article>
+  <article class="stat"><div><strong>{{ recent_ai_questions }}</strong><p>Study companion questions · last 7 days</p></div></article>
+  <article class="stat"><div><strong>{{ upload_count }}</strong><p>Resources uploaded · last 30 days</p></div></article>
+</div>
+<div class="detail-grid">
+  <section class="panel padded">
+    <h2>Uploads in the last 30 days</h2>
+    <h3>By resource type</h3>
+    <ul>{% for label, count in upload_types %}<li>{{ label }} · {{ count }}</li>{% empty %}<li>No uploads in this period.</li>{% endfor %}</ul>
+    {% if upload_days %}
+    <details><summary>View daily counts</summary>
+      <ul>{% for row in upload_days %}<li>{{ row.day|date:'d M Y' }} · {{ row.total }}</li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+  </section>
+  <section class="panel padded">
+    <h2>Most downloaded materials</h2>
+    <p>Student download requests recorded since this update.</p>
+    <ol>
+      {% for resource in most_downloaded %}
+      <li><a class="text-link" href="{% url 'resource_detail' resource.pk %}">{{ resource.title }}</a> · {{ resource.download_count }}</li>
+      {% empty %}<li>No student downloads recorded yet.</li>{% endfor %}
+    </ol>
+  </section>
+</div>
+<section class="panel padded mt">
+  <h2>Resources by subject</h2>
+  <div class="table-responsive">
+    <table class="table">
+      <thead><tr><th scope="col">Subject</th><th scope="col">Year / semester</th><th scope="col">Published</th><th scope="col">Drafts</th></tr></thead>
+      <tbody>
+        {% for subject in page %}
+        <tr><th scope="row"><a class="text-link" href="{% url 'subject_resources' subject.pk %}">{{ subject.name }}</a></th><td>{{ subject.semester.year }} · {{ subject.semester }}</td><td>{{ subject.published }}</td><td>{{ subject.drafts }}</td></tr>
+        {% empty %}<tr><td colspan="4">No subjects are configured.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'academy/pagination.html' %}
+</section>
+{% endblock %}

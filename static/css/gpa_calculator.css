@@ -1,0 +1,164 @@
+.gpa-calculator {
+  max-width: 860px;
+}
+
+.gpa-mode {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  background: #e9eee3;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.gpa-mode label {
+  position: relative;
+  cursor: pointer;
+}
+
+.gpa-mode input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+}
+
+.gpa-mode span {
+  display: block;
+  padding: 8px 14px;
+  border-radius: 7px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.gpa-mode input:checked + span {
+  color: white;
+  background: var(--green);
+}
+
+.gpa-mode input:focus-visible + span {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.gpa-panel {
+  padding: clamp(16px, 4vw, 30px);
+  overflow: visible;
+}
+
+.gpa-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.gpa-field select,
+.gpa-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid #c5d1c6;
+  border-radius: 7px;
+  background: #fafbf8;
+  color: var(--ink);
+}
+
+.gpa-semester-choice {
+  max-width: 260px;
+}
+
+.gpa-subjects,
+.gpa-result {
+  margin-top: 20px;
+}
+
+.gpa-subject-list {
+  list-style: none;
+  border-top: 1px solid var(--line);
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+.gpa-subject,
+.gpa-cgpa-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 145px;
+  align-items: center;
+  gap: 12px;
+}
+
+.gpa-subject {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.gpa-subject-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.gpa-cgpa-row {
+  border: 1px solid var(--line);
+  padding: 10px 14px 14px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.gpa-cgpa-row legend {
+  float: none;
+  width: auto;
+  padding: 0 5px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.gpa-cgpa-fields {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.gpa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.gpa-result {
+  padding: 15px 20px;
+  border-radius: 9px;
+  background: #edf2e9;
+  color: var(--green);
+  font-weight: 600;
+}
+
+.gpa-result output {
+  display: block;
+  font-size: 38px;
+  font-weight: 750;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .gpa-subject {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  }
+
+  .gpa-subject-name {
+    grid-column: 1 / -1;
+  }
+
+  .gpa-cgpa-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gpa-remove {
+    grid-column: 1 / -1;
+  }
+}

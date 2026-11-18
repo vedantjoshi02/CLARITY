@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Quiz generator · CLARITY{% endblock %}
+{% block breadcrumb %}Quiz generator{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><h1>AI quiz generator</h1><p>Practice multiple-choice questions based on approved materials for the selected subject.</p></div>
+</div>
+{% include 'academy/study_navigation.html' %}
+<div class="panel padded form-panel">
+  <form method="post" class="stack-form">
+    {% csrf_token %}{{ form.as_p }}
+    <button class="button" data-loading="Generating quiz…">Generate quiz</button>
+  </form>
+</div>
+{% if error %}<p class="notice error mt" role="alert">{{ error }}</p>{% endif %}
+
+{% if results %}
+<section class="panel padded mt">
+  <h2>Quiz results</h2>
+  <p>{{ quiz_subject.name }} · {{ quiz.difficulty|capfirst }}</p>
+  <p class="fs-4"><strong>{{ results.score }} / {{ results.rows|length }}</strong></p>
+  <h3>Topics to revisit</h3>
+  <ul>{% for topic in results.topics %}<li>{{ topic }}</li>{% empty %}<li>You answered every question correctly.</li>{% endfor %}</ul>
+  <ol>
+    {% for row in results.rows %}
+    <li class="mb-3">
+      <strong>{{ row.question }}</strong>
+      <p class="mb-1">Your answer: {{ row.chosen }} · {% if row.is_correct %}Correct{% else %}Incorrect{% endif %}</p>
+      <p class="mb-1">Correct answer: {{ row.correct_text }}</p>
+      <p class="mb-1">{{ row.explanation }}</p>
+      <a class="text-link" href="{% url 'resource_detail' row.resource %}">{{ row.title }} · page/section {{ row.page }}</a>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% elif quiz %}
+<section class="panel padded mt">
+  <h2>{{ quiz_subject.name }}</h2>
+  <p>{{ quiz.difficulty|capfirst }} · {{ quiz.questions|length }} question{{ quiz.questions|length|pluralize }}</p>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="grade">
+    <input type="hidden" name="quiz_id" value="{{ quiz.id }}">
+    {% for item in quiz.questions %}
+    <fieldset class="mb-4">
+      <legend class="fs-6 fw-semibold">{{ forloop.counter }}. {{ item.question }}</legend>
+      {% for option in item.options %}
+      <label class="d-block mb-1">
+        <input type="radio" name="answer_{{ forloop.parentloop.counter }}" value="{{ forloop.counter0 }}" required>
+        {{ option }}
+      </label>
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
+    <button class="button">Submit answers</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

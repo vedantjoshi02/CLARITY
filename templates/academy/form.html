@@ -1,0 +1,602 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+Manage
+{% endblock %}
+
+
+{% block content %}
+
+<a class="text-link" href="{{ back }}">
+    ← Back
+</a>
+
+
+<div class="page-heading">
+
+    <div>
+
+        <div class="eyebrow">
+            BUILD A BETTER LEARNING SPACE
+        </div>
+
+        <h1>{{ heading }}</h1>
+
+        <p>
+
+            {% if upload %}
+
+                PDF, DOCX and PowerPoint (PPT/PPTX)
+                · Up to 20 MB
+                · PPTX slide text is available for preview and AI search.
+
+            {% else %}
+
+                Keep your academic information clear
+                and up to date.
+
+            {% endif %}
+
+        </p>
+
+    </div>
+
+</div>
+
+
+<div class="panel padded form-panel">
+
+    <form
+        method="post"
+        enctype="multipart/form-data"
+        class="stack-form"
+        id="resource-form"
+    >
+
+        {% csrf_token %}
+
+
+        {% if upload %}
+
+            {{ form.non_field_errors }}
+
+            <!-- ================================= -->
+            <!-- ACADEMIC YEAR -->
+            <!-- ================================= -->
+
+            <div class="form-group">
+
+                <label for="{{ form.year.id_for_label }}">
+                    Academic Year
+                </label>
+
+                {{ form.year }}
+
+                {{ form.year.errors }}
+
+            </div>
+
+
+            <!-- ================================= -->
+            <!-- SEMESTER -->
+            <!-- ================================= -->
+
+            <div class="form-group">
+
+                <label for="{{ form.semester.id_for_label }}">
+                    Semester
+                </label>
+
+                {{ form.semester }}
+
+                {{ form.semester.errors }}
+
+            </div>
+
+
+            <!-- ================================= -->
+            <!-- SUBJECT -->
+            <!-- ================================= -->
+
+            <div class="form-group">
+
+                <label for="{{ form.subject.id_for_label }}">
+                    Subject
+                </label>
+
+                {{ form.subject }}
+
+                {{ form.subject.errors }}
+
+            </div>
+
+
+
+            <!-- ================================= -->
+            <!-- RESOURCE TYPE -->
+            <!-- ================================= -->
+
+            <div class="form-group">
+
+                <label for="{{ form.kind.id_for_label }}">
+                    Resource Type
+                </label>
+
+                {{ form.kind }}
+
+                {{ form.kind.errors }}
+
+            </div>
+
+
+            <!-- ================================= -->
+            <!-- RESOURCE TITLE -->
+            <!-- ================================= -->
+
+            <div class="form-group">
+
+                <label for="{{ form.title.id_for_label }}">
+                    Resource Title
+                </label>
+
+                {{ form.title }}
+
+                {{ form.title.errors }}
+
+            </div>
+
+
+            <!-- ================================= -->
+            <!-- DESCRIPTION -->
+            <!-- ================================= -->
+
+            <div class="form-group">
+
+                <label for="{{ form.description.id_for_label }}">
+                    Description
+                </label>
+
+                {{ form.description }}
+
+                {{ form.description.errors }}
+
+            </div>
+
+
+            <!-- ================================= -->
+            <!-- FILE UPLOAD -->
+            <!-- ================================= -->
+
+            <div class="form-group">
+
+                <label for="{{ form.file.id_for_label }}">
+                    Upload File
+                </label>
+
+                {{ form.file }}
+
+                {{ form.file.errors }}
+
+            </div>
+
+
+        {% else %}
+
+
+            {{ form.as_p }}
+
+
+        {% endif %}
+
+
+        <!-- ================================= -->
+        <!-- INFORMATION NOTICE -->
+        <!-- ================================= -->
+
+        {% if upload %}
+
+            <div class="notice">
+
+                <strong>Academic classification</strong>
+
+                <p>
+
+                    First select the academic year.
+                    Then select the semester.
+
+                    The subject dropdown will automatically
+                    display subjects belonging to that semester.
+
+                </p>
+
+                <p>
+
+                    PDF, DOCX and PPTX text can be indexed.
+                    Legacy PPT files can be downloaded but must
+                    be converted to PPTX for text preview and AI search.
+
+                </p>
+
+                <p>
+
+                    Only publish materials your institution
+                    is authorized to distribute.
+
+                </p>
+
+            </div>
+
+
+        {% elif academic_subject %}
+
+
+            <div class="notice">
+
+                This subject is being added or edited inside
+                the selected academic year and semester.
+
+                The semester list is limited to that year.
+
+            </div>
+
+
+        {% endif %}
+
+
+        <!-- ================================= -->
+        <!-- FORM BUTTONS -->
+        <!-- ================================= -->
+
+        <div class="actions">
+
+            <button
+                class="button"
+                data-loading="Saving…"
+            >
+
+                Save
+
+                {% if upload %}
+
+                    resource
+
+                {% else %}
+
+                    changes
+
+                {% endif %}
+
+                →
+
+            </button>
+
+
+            <a
+                class="button outline"
+                href="{{ back }}"
+            >
+
+                Cancel
+
+            </a>
+
+        </div>
+
+
+    </form>
+
+</div>
+
+
+{% if upload %}
+
+
+<script>
+
+document.addEventListener('DOMContentLoaded', function () {
+
+
+    // =====================================
+    // GET DROPDOWN ELEMENTS
+    // =====================================
+
+    const yearSelect = document.getElementById('id_year');
+
+    const semesterSelect = document.getElementById('id_semester');
+
+    const subjectSelect = document.getElementById('id_subject');
+
+
+    if (!yearSelect || !semesterSelect || !subjectSelect) {
+
+        return;
+
+    }
+
+
+    // =====================================
+    // RESET DROPDOWN
+    // =====================================
+
+    function resetDropdown(dropdown, placeholder) {
+
+        dropdown.innerHTML = '';
+
+        const option = document.createElement('option');
+
+        option.value = '';
+
+        option.textContent = placeholder;
+
+        dropdown.appendChild(option);
+
+    }
+
+
+    // =====================================
+    // LOAD SEMESTERS
+    // =====================================
+
+    async function loadSemesters(
+        yearId,
+        selectedSemester = null,
+        selectedSubject = null
+    ) {
+
+        resetDropdown(
+            semesterSelect,
+            'Loading semesters...'
+        );
+
+        resetDropdown(
+            subjectSelect,
+            'Select semester first'
+        );
+
+        semesterSelect.disabled = true;
+
+        subjectSelect.disabled = true;
+
+        if (!yearId) {
+
+            resetDropdown(
+                semesterSelect,
+                'Select academic year first'
+            );
+
+            return;
+
+        }
+
+
+        try {
+
+            const response = await fetch(
+                "{% url 'get_semesters' %}?year="
+                + encodeURIComponent(yearId)
+            );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    'Unable to load semesters'
+                );
+
+            }
+
+
+            const data = await response.json();
+
+
+            resetDropdown(
+                semesterSelect,
+                'Select Semester'
+            );
+
+
+            data.semesters.forEach(function (semester) {
+
+                const option = document.createElement('option');
+
+                option.value = semester.id;
+
+                option.textContent = semester.name;
+
+                if (
+                    String(semester.id)
+                    === String(selectedSemester)
+                ) {
+
+                    option.selected = true;
+
+                }
+
+                semesterSelect.appendChild(option);
+
+            });
+
+
+            semesterSelect.disabled = false;
+
+
+            if (selectedSemester) {
+
+                await loadSubjects(
+                    selectedSemester,
+                    selectedSubject
+                );
+
+            }
+
+
+        } catch (error) {
+
+            resetDropdown(
+                semesterSelect,
+                'Unable to load semesters'
+            );
+
+            console.error(error);
+
+        }
+
+    }
+
+
+    // =====================================
+    // LOAD SUBJECTS
+    // =====================================
+
+    async function loadSubjects(
+        semesterId,
+        selectedSubject = null
+    ) {
+
+        resetDropdown(
+            subjectSelect,
+            'Loading subjects...'
+        );
+
+        subjectSelect.disabled = true;
+
+        if (!semesterId) {
+
+            resetDropdown(
+                subjectSelect,
+                'Select semester first'
+            );
+
+            return;
+
+        }
+
+
+        try {
+
+            const response = await fetch(
+                "{% url 'get_subjects' %}?semester="
+                + encodeURIComponent(semesterId)
+            );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    'Unable to load subjects'
+                );
+
+            }
+
+
+            const data = await response.json();
+
+
+            resetDropdown(
+                subjectSelect,
+                'Select Subject'
+            );
+
+
+            data.subjects.forEach(function (subject) {
+
+                const option = document.createElement('option');
+
+                option.value = subject.id;
+
+                option.textContent = subject.name;
+
+                if (
+                    String(subject.id)
+                    === String(selectedSubject)
+                ) {
+
+                    option.selected = true;
+
+                }
+
+                subjectSelect.appendChild(option);
+
+            });
+
+
+            subjectSelect.disabled = false;
+
+
+        } catch (error) {
+
+            resetDropdown(
+                subjectSelect,
+                'Unable to load subjects'
+            );
+
+            console.error(error);
+
+        }
+
+    }
+
+
+    // =====================================
+    // YEAR CHANGE EVENT
+    // =====================================
+
+    yearSelect.addEventListener('change', function () {
+
+        loadSemesters(
+            this.value
+        );
+
+    });
+
+
+    // =====================================
+    // SEMESTER CHANGE EVENT
+    // =====================================
+
+    semesterSelect.addEventListener('change', function () {
+
+        loadSubjects(
+            this.value
+        );
+
+    });
+
+
+    // =====================================
+    // INITIALIZE FORM
+    // =====================================
+
+    const initialYear = yearSelect.value;
+
+    const initialSemester = semesterSelect.value;
+
+    const initialSubject = subjectSelect.value;
+
+
+    if (initialYear) {
+
+        loadSemesters(
+            initialYear,
+            initialSemester || null,
+            initialSubject || null
+        );
+
+    } else {
+
+        semesterSelect.disabled = true;
+
+        subjectSelect.disabled = true;
+
+    }
+
+
+});
+
+</script>
+
+
+{% endif %}
+
+
+{% endblock %}

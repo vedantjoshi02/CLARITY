@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}SGPA/CGPA Calculator · CLARITY{% endblock %}
+{% block breadcrumb %}SGPA/CGPA Calculator{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/gpa_calculator.css' %}">
+<script src="{% static 'js/gpa_calculator.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+  <div>
+    <h1>SGPA/CGPA Calculator</h1>
+    <p>Calculate a semester’s grade point average or combine results across semesters.</p>
+  </div>
+</div>
+
+<noscript><p class="notice">Enable JavaScript to use the calculator.</p></noscript>
+
+<div id="gpa-calculator" class="gpa-calculator" hidden>
+  <fieldset class="gpa-mode">
+    <legend class="visually-hidden">Calculation mode</legend>
+    <label><input type="radio" name="gpa-mode" value="sgpa" checked><span>Calculate SGPA</span></label>
+    <label><input type="radio" name="gpa-mode" value="cgpa"><span>Calculate CGPA</span></label>
+  </fieldset>
+
+  <div class="panel gpa-panel">
+    <form id="sgpa-form" aria-labelledby="sgpa-heading">
+      <h2 id="sgpa-heading">Semester GPA</h2>
+      <div class="gpa-field gpa-semester-choice">
+        <label for="gpa-semester">Semester</label>
+        <select id="gpa-semester">
+          <option value="">Select a semester</option>
+          {% for semester in semester_subjects %}
+          <option value="{{ semester }}">Semester {{ semester }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="sgpa-subjects" class="gpa-subjects" hidden>
+        <p id="internship-help" hidden>Enter the Internship credits shown on your grade sheet.</p>
+        <ul id="sgpa-rows" class="gpa-subject-list"></ul>
+        <button class="button" type="submit">Calculate SGPA</button>
+      </div>
+      <div class="gpa-result" id="sgpa-result" hidden>
+        <span>SGPA</span>
+        <output id="sgpa-value"></output>
+        <span id="sgpa-credits"></span>
+      </div>
+    </form>
+
+    <form id="cgpa-form" aria-labelledby="cgpa-heading" hidden>
+      <h2 id="cgpa-heading">Cumulative GPA</h2>
+      <p>Enter the SGPA and total credits for each semester you want to include.</p>
+      <div id="cgpa-rows" class="gpa-cgpa-rows"></div>
+      <div class="gpa-actions">
+        <button class="button outline" id="cgpa-add" type="button">Add semester</button>
+        <button class="button" type="submit">Calculate CGPA</button>
+      </div>
+      <div class="gpa-result" id="cgpa-result" hidden>
+        <span>CGPA</span>
+        <output id="cgpa-value"></output>
+        <span id="cgpa-credits"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<template id="sgpa-row">
+  <li class="gpa-subject">
+    <strong class="gpa-subject-name"></strong>
+    <div class="gpa-field gpa-subject-credits">
+      <span class="gpa-credit-text"></span>
+      <label class="gpa-credit-label" hidden>Credits
+        <input type="number" min="1" max="9007199254740991" step="1" required disabled aria-describedby="internship-help">
+      </label>
+    </div>
+    <label class="gpa-field gpa-grade-label">Grade
+      <select required>
+        <option value="">Select grade</option>
+        {% for grade, points in grade_points.items %}
+        <option value="{{ points }}">{{ grade }} ({{ points }})</option>
+        {% endfor %}
+      </select>
+    </label>
+  </li>
+</template>
+
+<template id="cgpa-row">
+  <fieldset class="gpa-cgpa-row">
+    <legend></legend>
+    <div class="gpa-cgpa-fields">
+      <label class="gpa-field">SGPA
+        <input type="number" min="0" max="10" step="any" required>
+      </label>
+      <label class="gpa-field">Total credits
+        <input type="number" min="1" max="9007199254740991" step="1" required>
+      </label>
+      <button class="button outline gpa-remove" type="button">Remove</button>
+    </div>
+  </fieldset>
+</template>
+
+{{ semester_subjects|json_script:'gpa-curriculum' }}
+{% endblock %}

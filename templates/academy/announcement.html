@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block breadcrumb %}Announcements{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>Year announcements</h1></div>
+<div class="detail-grid">
+  <section class="panel padded">
+    <h2>New announcement</h2>
+    <p>Students in the selected academic year will see this message in Notifications.</p>
+    <form method="post" class="stack-form">
+      {% csrf_token %}{{ form.as_p }}
+      <button class="button">Send announcement</button>
+    </form>
+  </section>
+  <section class="panel padded">
+    <h2>Recently sent</h2>
+    {% for notice in recent %}
+    <article class="timeline-item">
+      <h3>{{ notice.title }}</h3>
+      <p>{{ notice.year }} · {{ notice.created_at|date:'d M Y' }}</p>
+      <p>{{ notice.message|linebreaksbr }}</p>
+    </article>
+    {% empty %}<p>No announcements sent yet.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

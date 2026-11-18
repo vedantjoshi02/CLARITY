@@ -1,0 +1,281 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+Academic structure
+{% endblock %}
+
+
+{% block content %}
+
+<div class="page-heading">
+
+    <div>
+
+        <div class="eyebrow">
+            ACADEMIC MANAGEMENT
+        </div>
+
+        <h1>Manage subjects.</h1>
+
+        <p>
+            Select an academic year, choose its semester,
+            and manage the subjects in that semester.
+        </p>
+
+    </div>
+
+</div>
+
+
+{% if not years %}
+
+    <div class="notice error">
+
+        The academic years and semesters have not been
+        initialized yet.
+
+        Run:
+
+        <code>python manage.py seed_demo</code>
+
+        from your project folder and refresh this page.
+
+    </div>
+
+{% else %}
+
+
+<!-- ===================================== -->
+<!-- ACADEMIC YEAR AND SEMESTER SELECTION -->
+<!-- ===================================== -->
+
+<section class="panel padded academic-selector">
+
+    <form method="get" class="academic-filter">
+
+        <div>
+
+            <label for="year-select">
+                1. Select academic year
+            </label>
+
+            <select
+                id="year-select"
+                name="year"
+                onchange="this.form.submit()"
+            >
+
+                {% for year in years %}
+
+                    <option
+                        value="{{ year.pk }}"
+                        {% if selected_year.pk == year.pk %}
+                            selected
+                        {% endif %}
+                    >
+
+                        {{ year.label }}
+
+                    </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+
+        <div>
+
+            <label for="semester-select">
+                2. Select semester
+            </label>
+
+            <select
+                id="semester-select"
+                name="semester"
+                onchange="this.form.submit()"
+            >
+
+                {% for semester in semesters %}
+
+                    <option
+                        value="{{ semester.pk }}"
+                        {% if selected_semester.pk == semester.pk %}
+                            selected
+                        {% endif %}
+                    >
+
+                        {{ semester }}
+
+                    </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+
+        <noscript>
+
+            <button type="submit" class="button">
+                Show subjects
+            </button>
+
+        </noscript>
+
+    </form>
+
+</section>
+
+
+<!-- ===================================== -->
+<!-- SUBJECT MANAGEMENT -->
+<!-- ===================================== -->
+
+{% if selected_semester %}
+
+
+    <div class="section-heading mt">
+
+        <div>
+
+            <div class="eyebrow">
+
+                {{ selected_year.label|upper }}
+                ·
+                {{ selected_semester }}
+
+            </div>
+
+            <h2>
+                Subjects in this semester
+            </h2>
+
+        </div>
+
+
+        <a
+            class="button"
+            href="{% url 'academic_new' 'subject' %}?year={{ selected_year.pk }}&semester={{ selected_semester.pk }}"
+        >
+
+            ＋ Add subject
+
+        </a>
+
+    </div>
+
+
+    <div class="panel">
+
+        {% for subject in subjects %}
+
+            <div class="academic-subject-row">
+
+
+                <div class="subject-row-icon">
+                    ▤
+                </div>
+
+
+                <div class="academic-subject-info">
+
+                    <strong>
+                        {{ subject.name }}
+                    </strong>
+
+                    <small>
+                        {{ subject.code }}
+                    </small>
+
+
+                    {% if subject.description %}
+
+                        <p>
+                            {{ subject.description }}
+                        </p>
+
+                    {% endif %}
+
+
+                    <small>
+
+                        {{ subject.resources.count }}
+                        uploaded resource{{ subject.resources.count|pluralize }}
+
+                    </small>
+
+                </div>
+
+
+                <div class="actions">
+
+                    <a
+                        href="{% url 'academic_edit' 'subject' subject.pk %}"
+                    >
+                        Edit
+                    </a>
+
+
+                    <a
+                        class="danger-link"
+                        href="{% url 'academic_delete' 'subject' subject.pk %}"
+                    >
+                        Remove
+                    </a>
+
+                </div>
+
+
+            </div>
+
+
+        {% empty %}
+
+
+            <div class="empty">
+
+                <span>▤</span>
+
+                <h3>
+                    No subjects added yet.
+                </h3>
+
+                <p>
+
+                    Use "Add subject" to add the first subject
+                    to {{ selected_year.label }},
+                    {{ selected_semester }}.
+
+                </p>
+
+            </div>
+
+
+        {% endfor %}
+
+    </div>
+
+
+{% else %}
+
+
+    <div class="notice">
+
+        No semesters are configured for
+        {{ selected_year.label }}.
+
+        Run the academic structure setup command
+        or contact the project administrator.
+
+    </div>
+
+
+{% endif %}
+
+
+{% endif %}
+
+{% endblock %}
