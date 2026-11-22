@@ -1,7 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path, reverse_lazy
 
-from . import engagement, study_tools
+from . import engagement, paper_frequency, previews, study_tools
 from .passwords import StudentPasswordReset
 
 from . import views as v
@@ -23,6 +23,9 @@ urlpatterns = [
     path('dashboard/notifications/', engagement.notifications, name='notifications'),
     path('dashboard/notifications/<int:pk>/read/', engagement.read_notification, name='read_notification'),
     path('resources/<int:pk>/save/', engagement.save_resource, name='save_resource'),
+    path('resources/<int:pk>/preview/', previews.resource_preview, name='resource_preview'),
+    path('resources/<int:pk>/preview/pdf/', previews.preview_pdf, name='preview_pdf'),
+    path('assistant/paper-frequency/', paper_frequency.paper_frequency, name='paper_frequency'),
     path('assistant/quiz/', study_tools.quiz_view, name='quiz'),
     path('assistant/summarize/', study_tools.written_tool, {'tool': 'summary'}, name='summary'),
     path('assistant/evaluate/', study_tools.written_tool, {'tool': 'evaluation'}, name='evaluation'),

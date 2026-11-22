@@ -1,0 +1,18 @@
+<ol class="mb-0">
+{% for row in rows %}
+  <li class="mb-3">
+    <strong>{{ row.label }}</strong> <span class="badge-soft">{{ row.count }} / {{ total }} checked papers</span>
+    {% if quiz_subject %}<a class="text-link ms-2" href="{% url 'quiz' %}?subject={{ quiz_subject }}&amp;topic={{ row.label|urlencode }}">Practice this topic →</a>{% endif %}
+    <details class="mt-1">
+      <summary>View quoted questions and sources</summary>
+      <ul>
+      {% for source in row.sources %}
+        <li><a href="{% url 'resource_preview' source.paper.pk %}?page={{ source.page }}">{{ source.paper.title }} · page/section {{ source.page }}</a><br><q>{{ source.quote }}</q></li>
+      {% endfor %}
+      </ul>
+    </details>
+  </li>
+{% empty %}
+  <li class="list-unstyled">No matching question evidence was found in the papers checked.</li>
+{% endfor %}
+</ol>

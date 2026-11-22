@@ -186,7 +186,7 @@ class EnhancementTests(TestCase):
             'question': 'Which condition requires exclusive access?',
             'options': ['Mutual exclusion', 'Paging', 'Scheduling', 'Buffering'],
             'correct': 0, 'topic': 'Deadlock conditions', 'explanation': 'Exclusive access is the defining property.',
-            'source': 1,
+            'source': 1, 'evidence': 'Deadlock requires mutual exclusion',
         }]))
         quiz_url = reverse('quiz')
         data = {'subject': self.subject.pk, 'difficulty': 'medium', 'questions': 1}
@@ -210,7 +210,8 @@ class EnhancementTests(TestCase):
         self.assertNotContains(page, 'Exclusive access is the defining property.')
         quiz = page.context['quiz']
         self.assertContains(self.client.post(quiz_url, {'action': 'grade', 'quiz_id': quiz['id']}), 'Answer every question')
-        grade = {'action': 'grade', 'quiz_id': quiz['id'], 'answer_1': '1'}
+        wrong_option = (quiz['questions'][0]['correct'] + 1) % 4
+        grade = {'action': 'grade', 'quiz_id': quiz['id'], 'answer_1': str(wrong_option)}
         self.assertRedirects(self.client.post(quiz_url, grade), quiz_url)
         page = self.client.get(quiz_url)
         self.assertContains(page, '0 / 1')

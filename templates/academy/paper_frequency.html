@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Past paper frequency · CLARITY{% endblock %}
+{% block breadcrumb %}Past paper frequency{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><h1>Past paper frequency</h1><p>Find topics and questions that appeared repeatedly in the available previous-year papers.</p></div>
+</div>
+{% include 'academy/study_navigation.html' %}
+<div class="panel padded form-panel">
+  <form method="post" class="stack-form">
+    {% csrf_token %}{{ form.as_p }}
+    <button class="button" data-loading="Reading past papers…">Analyze past papers</button>
+  </form>
+  <p class="muted mt-3 mb-0">Clarity checks up to six recently uploaded, approved and indexed papers per subject within the text limit. The ranking describes the papers checked. Future papers may cover different topics.</p>
+</div>
+{% if result %}
+<section class="panel padded mt">
+  <h2>{{ result.subject.name }} · Papers checked</h2>
+  <p>{{ result.papers|length }} of {{ result.eligible_count }} eligible indexed file{{ result.eligible_count|pluralize }} checked. Clarity verified at least one question in {{ result.verified_count }} of the checked files.</p>
+  <ul>{% for paper in result.papers %}<li><a href="{% url 'resource_detail' paper.pk %}">{{ paper.title }}</a></li>{% endfor %}</ul>
+  {% if result.unverified_papers %}<p class="muted">No quoted question could be verified in {% for paper in result.unverified_papers %}{{ paper.title }}{% if not forloop.last %}, {% endif %}{% endfor %}. Counts can be incomplete when the indexed text is missing or difficult to read.</p>{% endif %}
+  <p class="muted mb-0">Each topic or repeated question counts at most once per uploaded paper. Files with identical indexed text are counted once. AI groups similar wording, so review the quoted examples before setting revision priorities.</p>
+</section>
+<section class="panel padded mt">
+  <h2>Topics ranked by paper frequency</h2>
+  {% include 'academy/paper_frequency_rows.html' with rows=result.topics total=result.papers|length quiz_subject=result.subject.pk only %}
+</section>
+<section class="panel padded mt">
+  <h2>Questions repeated across papers</h2>
+  {% include 'academy/paper_frequency_rows.html' with rows=result.questions total=result.papers|length only %}
+</section>
+{% endif %}
+{% endblock %}

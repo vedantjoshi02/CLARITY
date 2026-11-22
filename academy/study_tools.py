@@ -1,17 +1,20 @@
 import json
 import logging
+import random
+import re
 from uuid import uuid4
 
 from django import forms
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from google.genai import types
 
 from .access import resources_for, role_required, subjects_for
 from .models import DocumentChunk
-from .rag import error_code, get_gemini_client, retrieve
+from .rag import error_code, get_gemini_client, lexical_scores, retrieve, search_terms
 
 logger = logging.getLogger(__name__)
 QUIZ_DIFFICULTIES = ('easy', 'medium', 'hard')
@@ -26,6 +29,8 @@ class StudyToolError(ValueError):
 class QuizForm(forms.Form):
     subject = forms.ModelChoiceField(queryset=None)
     difficulty = forms.ChoiceField(choices=[(level, level.capitalize()) for level in QUIZ_DIFFICULTIES], initial='medium')
+    topic = forms.CharField(label='Focus topic (optional)', required=False, max_length=120,
+                            help_text='Leave blank for a quiz across the subject.')
     questions = forms.IntegerField(label='Number of questions', min_value=1, max_value=15, initial=5)
 
     def __init__(self, *args, user, **kwargs):
@@ -66,7 +71,7 @@ def indexed_resources(user):
     return resources_for(user).filter(approved=True, status='ready')
 
 
-def generate(instructions, context, *, structured=False):
+def generate(instructions, context, *, structured=False, output_tokens=8192):
     if settings.LLM_PROVIDER != 'gemini' or not settings.GEMINI_API_KEY:
         raise StudyToolError('AI study tools require Gemini to be enabled by your administrator.')
     config = types.GenerateContentConfig(
@@ -76,7 +81,7 @@ def generate(instructions, context, *, structured=False):
             'and only for claims they support. Never invent a page, source, or official grading decision. '
             + instructions
         ),
-        max_output_tokens=max(settings.AI_MAX_OUTPUT_TOKENS, 8192),
+        max_output_tokens=max(settings.AI_MAX_OUTPUT_TOKENS, output_tokens),
         response_mime_type='application/json' if structured else 'text/plain',
     )
     try:
@@ -92,36 +97,126 @@ def generate(instructions, context, *, structured=False):
     return answer
 
 
+def quiz_sources(resources, count):
+    """Sample throughout several approved documents, including later pages."""
+    limit = min(28, max(8, count * 3))
+    resource_ids = list(resources.exclude(kind__in=('pyp', 'test')).order_by('-created_at', '-pk')
+                        .values_list('pk', flat=True)[:8])
+    if not resource_ids:
+        resource_ids = list(resources.order_by('-created_at', '-pk').values_list('pk', flat=True)[:8])
+    samples = []
+    for resource_id in resource_ids:
+        ids = list(DocumentChunk.objects.filter(resource_id=resource_id)
+                   .order_by('position', 'pk').values_list('pk', flat=True))
+        if ids:
+            samples.append(ids)
+    if not samples:
+        return []
+
+    quotas = [1] * len(samples)
+    while sum(quotas) < limit:
+        expandable = [i for i, ids in enumerate(samples) if quotas[i] < len(ids)]
+        if not expandable:
+            break
+        index = min(expandable, key=quotas.__getitem__)
+        quotas[index] += 1
+    chosen = [
+        [ids[step * (len(ids) - 1) // max(1, quota - 1)] for step in range(quota)]
+        for ids, quota in zip(samples, quotas, strict=True)
+    ]
+    selected = [ids[step] for step in range(max(quotas)) for ids in chosen if step < len(ids)]
+    chunks = DocumentChunk.objects.select_related('resource').in_bulk(selected)
+    sources = []
+    seen = set()
+    for pk in selected:
+        chunk = chunks.get(pk)
+        if chunk is None:
+            continue
+        key = ' '.join(chunk.text.casefold().split())
+        if key not in seen or len(sources) < len(samples):
+            sources.append(chunk)
+            seen.add(key)
+        if len(sources) == limit:
+            break
+    return sources
+
+
+def focused_quiz_sources(resources, topic, count):
+    terms = list(dict.fromkeys(search_terms(topic)))[:12]
+    if not terms:
+        return []
+    match = Q()
+    for term in terms:
+        match |= Q(text__icontains=term)
+    candidates = list(DocumentChunk.objects.filter(match, resource__in=resources)
+                      .select_related('resource').order_by('position', 'resource_id', 'pk')[:240])
+    scores = lexical_scores(candidates, topic)
+    sources = []
+    seen = set()
+    for index in sorted(scores, key=scores.get, reverse=True):
+        chunk = candidates[index]
+        key = ' '.join(chunk.text.casefold().split())
+        if key not in seen:
+            sources.append(chunk)
+            seen.add(key)
+        if len(sources) >= min(28, max(8, count * 3)):
+            break
+    return sources
+
+
+DIFFICULTY_GUIDANCE = {
+    'easy': 'Test one core concept, property or direct interpretation per question.',
+    'medium': 'Use short cases, comparisons, worked examples or concept application. Avoid simple recall.',
+    'hard': 'Ask for multi-step reasoning, tradeoffs, edge cases or tracing an example. Avoid obscure trivia.',
+}
+
+
 def create_quiz(user, data):
     subject, count = data['subject'], data['questions']
     resources = indexed_resources(user).filter(subject=subject)
-    sources = list(
-        DocumentChunk.objects.filter(resource__in=resources).select_related('resource')
-        .order_by('position', 'resource_id', 'pk')[:min(24, max(5, count * 2))]
-    )
+    topic = data.get('topic', '')
+    sources = focused_quiz_sources(resources, topic, count) if topic else quiz_sources(resources, count)
+    if not sources and topic:
+        raise StudyToolError('No matching indexed material was found for that topic. Try a shorter term or leave the field blank.')
     if not sources:
         raise StudyToolError('No approved indexed material is available for this subject.')
     excerpts = '\n\n'.join(
         f'[{index}] {chunk.resource.title}, page/section {chunk.page}\n{chunk.text}'
         for index, chunk in enumerate(sources, 1)
     )
-    result = generate(
-        'Write distinct multiple-choice questions covering the subject topics supported by the supplied excerpts. Return a JSON array '
-        'of objects with keys question, options (exactly four distinct strings), correct (zero-based option index), '
-        'explanation, topic, and source (the integer excerpt label supporting the answer). '
-        'Return an empty JSON array if the excerpts cannot support the requested number of distinct questions.',
-        f'Subject: {subject.name}\nDifficulty: {data["difficulty"]}\n'
-        f'Question count: {count}\n\nApproved excerpts:\n{excerpts}',
-        structured=True,
+    instructions = (
+        'Write a rigorous engineering practice quiz. Cover distinct learning objectives across the supplied material. '
+        'If a focus topic is specified, keep all questions on that topic. '
+        'Use standalone question stems and exactly one unambiguously correct option. Each distractor must sound '
+        'plausible to a student with a common misconception and use the same level of detail as the correct option. '
+        'Avoid trivial opposites, option labels, giveaway wording, repeated questions and all/none of the above. '
+        'Check every answer and any calculation. In the explanation, state why the correct answer follows and why '
+        'the closest distractor fails. When using an exam-paper excerpt, use it only if the answer can be supported '
+        'by the excerpts. Return a JSON array of objects with keys question, options (four strings), correct '
+        '(zero-based index), explanation, topic, source (integer excerpt label), and evidence (a short exact quote '
+        'from that excerpt that supports the correct answer). Return an empty array if the excerpts cannot support '
+        'the full requested count without guessing.'
     )
-    try:
-        questions = parse_quiz(result, count, sources)
-    except (ValueError, KeyError, TypeError) as exc:
-        raise StudyToolError(
-            'The AI could not generate a complete quiz from this material. Try fewer questions or select another subject.'
-        ) from exc
-    return {'id': uuid4().hex, 'subject': subject.pk,
-            'difficulty': data['difficulty'], 'questions': questions, 'sources': [chunk.pk for chunk in sources]}
+    prompt = (
+        f'Subject: {subject.name}\nDifficulty: {data["difficulty"]}. {DIFFICULTY_GUIDANCE[data["difficulty"]]}\n'
+        f'Focus topic: {topic or "Whole subject"}\nQuestion count: {count}\n\nApproved excerpts:\n{excerpts}'
+    )
+    for attempt in range(2):
+        retry_instruction = ' Double-check the schema, evidence quotes and distinct questions before returning.' if attempt else ''
+        result = generate(instructions + retry_instruction, prompt, structured=True)
+        try:
+            questions = parse_quiz(result, count, sources)
+        except (ValueError, KeyError, TypeError):
+            continue
+        return {'id': uuid4().hex, 'subject': subject.pk, 'difficulty': data['difficulty'],
+                'questions': questions, 'topic': topic, 'sources': [chunk.pk for chunk in sources]}
+    raise StudyToolError(
+        'Clarity could not build a complete quiz with source evidence. Try fewer questions or ask your administrator to add more material.'
+    )
+
+
+def text_key(value):
+    return ' '.join(re.findall(r'[\w+#=<>*/%&|^!.-]+', value.casefold().strip(' .?!')))
 
 
 def parse_quiz(result, count, sources):
@@ -129,7 +224,7 @@ def parse_quiz(result, count, sources):
     if not isinstance(payload, list) or len(payload) != count:
         raise ValueError('Unexpected question count.')
     questions = []
-    seen = set()
+    seen = []
     for item in payload:
         if not isinstance(item, dict):
             raise ValueError('Invalid question.')
@@ -143,16 +238,34 @@ def parse_quiz(result, count, sources):
             not isinstance(value, str) or not value.strip() or len(value) > 500 for value in options
         ):
             raise ValueError('Invalid options.')
-        if len({value.strip().casefold() for value in options}) != 4 or question.strip().casefold() in seen:
-            raise ValueError('Duplicate quiz text.')
+        option_keys = [text_key(value) for value in options]
+        question_terms = set(text_key(question).split())
+        if '' in option_keys or len(set(option_keys)) != 4 or not question_terms or any(
+            key in {'all of the above', 'none of the above', 'both a and b', 'all options', 'none of these'}
+            for key in option_keys
+        ):
+            raise ValueError('Ambiguous or duplicate options.')
+        if any(len(question_terms & previous) / len(question_terms | previous) >= 0.85 for previous in seen):
+            raise ValueError('Duplicate quiz question.')
         if type(correct) is not int or not 0 <= correct < 4 or type(source) is not int or not 1 <= source <= len(sources):
             raise ValueError('Invalid correct answer or source.')
-        seen.add(question.strip().casefold())
         chunk = sources[source - 1]
+        quote = item['evidence']
+        if not isinstance(quote, str) or not 12 <= len(quote.strip()) <= 500:
+            raise ValueError('Missing supporting quote.')
+        quote_key = ' '.join(quote.casefold().split())
+        chunk_key = ' '.join(chunk.text.casefold().split())
+        if not re.search(r'(?<!\w)' + re.escape(quote_key) + r'(?!\w)', chunk_key):
+            raise ValueError('Quote does not match the cited excerpt.')
+        seen.append(question_terms)
+        order = list(range(4))
+        random.shuffle(order)
         questions.append({
-            'question': question, 'options': options, 'correct': correct, 'explanation': explanation,
-            'topic': topic, 'resource': chunk.resource_id, 'page': chunk.page, 'title': chunk.resource.title,
+            'question': question.strip(), 'options': [options[i].strip() for i in order],
+            'correct': order.index(correct), 'explanation': explanation.strip(), 'evidence': quote.strip(),
+            'topic': topic.strip(), 'resource': chunk.resource_id, 'page': chunk.page, 'title': chunk.resource.title,
         })
+
     return questions
 
 
@@ -227,7 +340,13 @@ def quiz_view(request):
     if request.user.is_superuser:
         raise PermissionDenied
     grading = request.method == 'POST' and request.POST.get('action') == 'grade'
-    form = QuizForm(None if grading else request.POST or None, user=request.user)
+    subject_hint = request.GET.get('subject', '')
+    topic_hint = request.GET.get('topic', '')[:120]
+    form = QuizForm(
+        None if grading else request.POST or None, user=request.user,
+        initial={'subject': subject_hint if subject_hint.isascii() and subject_hint.isdigit() and len(subject_hint) <= 18 else None,
+                 'topic': topic_hint},
+    )
     quiz, quiz_subject = current_quiz(request) or (None, None)
     error = ''
     if grading:

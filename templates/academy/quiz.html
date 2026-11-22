@@ -17,7 +17,7 @@
 {% if results %}
 <section class="panel padded mt">
   <h2>Quiz results</h2>
-  <p>{{ quiz_subject.name }} · {{ quiz.difficulty|capfirst }}</p>
+  <p>{{ quiz_subject.name }} · {{ quiz.difficulty|capfirst }}{% if quiz.topic %} · {{ quiz.topic }}{% endif %}</p>
   <p class="fs-4"><strong>{{ results.score }} / {{ results.rows|length }}</strong></p>
   <h3>Topics to revisit</h3>
   <ul>{% for topic in results.topics %}<li>{{ topic }}</li>{% empty %}<li>You answered every question correctly.</li>{% endfor %}</ul>
@@ -28,6 +28,7 @@
       <p class="mb-1">Your answer: {{ row.chosen }} · {% if row.is_correct %}Correct{% else %}Incorrect{% endif %}</p>
       <p class="mb-1">Correct answer: {{ row.correct_text }}</p>
       <p class="mb-1">{{ row.explanation }}</p>
+      {% if row.evidence %}<p class="mb-1"><q>{{ row.evidence }}</q></p>{% endif %}
       <a class="text-link" href="{% url 'resource_detail' row.resource %}">{{ row.title }} · page/section {{ row.page }}</a>
     </li>
     {% endfor %}
@@ -36,7 +37,7 @@
 {% elif quiz %}
 <section class="panel padded mt">
   <h2>{{ quiz_subject.name }}</h2>
-  <p>{{ quiz.difficulty|capfirst }} · {{ quiz.questions|length }} question{{ quiz.questions|length|pluralize }}</p>
+  <p>{{ quiz.difficulty|capfirst }}{% if quiz.topic %} · {{ quiz.topic }}{% endif %} · {{ quiz.questions|length }} question{{ quiz.questions|length|pluralize }}</p>
   <form method="post">
     {% csrf_token %}
     <input type="hidden" name="action" value="grade">

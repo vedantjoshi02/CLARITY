@@ -128,13 +128,19 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 import dj_database_url
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL"),
-        conn_max_age=0,
-        ssl_require=True,
-    )
-}
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=0,
+            ssl_require=DATABASE_URL.startswith(("postgres:", "postgresql:")),
+        )
+    }
+elif DEBUG:
+    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
+else:
+    raise RuntimeError("Set DATABASE_URL before deployment.")
 
 
 # ==========================================================
@@ -195,18 +201,6 @@ STATICFILES_DIRS = [
 ]
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
-# ==========================================================
-# DEFAULT STORAGE CONFIGURATION
-# ==========================================================
-
-STORAGES = {
-    "default": {
-        "BACKEND": "academy.storage.SupabasePrivateStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
 
 
 # ==========================================================
@@ -217,21 +211,6 @@ STORAGES = {
 # Do not expose MEDIA_ROOT through a public URL.
 
 MEDIA_ROOT = BASE_DIR / "private_media"
-# ==========================================================
-# SUPABASE PRIVATE STORAGE
-# ==========================================================
-
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
-
-SUPABASE_SECRET_KEY = os.getenv(
-    "SUPABASE_SECRET_KEY",
-    ""
-).strip()
-
-SUPABASE_STORAGE_BUCKET = os.getenv(
-    "SUPABASE_STORAGE_BUCKET",
-    "clarity-documents"
-).strip()
 
 
 # ==========================================================
@@ -261,9 +240,6 @@ CSRF_COOKIE_SECURE = not DEBUG
 # ==========================================================
 
 SECURE_SSL_REDIRECT = not DEBUG
-
-# Render terminates HTTPS at its proxy and forwards the original scheme.
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
 

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}{{ resource.title }} · CLARITY reader{% endblock %}
+{% block breadcrumb %}Resource reader{% endblock %}
+{% block content %}
+<a class="text-link" href="{% url 'resource_detail' resource.pk %}">← Resource details</a>
+<div class="page-heading">
+  <div><h1>{{ resource.title }}</h1><p>{{ resource.subject.name }} · {{ resource.file_format }}</p></div>
+  <a class="button outline" href="{% url 'download' resource.pk %}">Download original</a>
+</div>
+{% if pdf %}
+  <p><a class="text-link" href="{% url 'preview_pdf' resource.pk %}#page={{ pdf_page }}" target="_blank" rel="noopener">Open PDF in a new tab ↗</a></p>
+  <iframe class="resource-pdf" src="{% url 'preview_pdf' resource.pk %}#page={{ pdf_page }}" title="{{ resource.title }} PDF"></iframe>
+{% elif error %}
+  <p class="notice error" role="alert">{{ error }}</p>
+{% else %}
+  <p class="muted">Reading view. The original may use different formatting or contain elements such as charts, animations or media.</p>
+  {% if slide %}
+  <nav class="actions mb-3" aria-label="Slide navigation">
+    {% if slide.has_previous %}<a class="button outline" href="?slide={{ slide.previous_page_number }}">Previous slide</a>{% endif %}
+    <strong>Slide {{ slide.number }} of {{ slide.paginator.num_pages }}</strong>
+    {% if slide.has_next %}<a class="button outline" href="?slide={{ slide.next_page_number }}">Next slide</a>{% endif %}
+  </nav>
+  {% endif %}
+  <section class="panel padded office-preview" aria-label="Document content">
+    {% for block in blocks %}
+      {% if block.table %}
+        <div class="table-responsive mb-3"><table class="table table-bordered"><tbody>
+          {% for row in block.table %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}
+        </tbody></table></div>
+      {% elif block.image %}
+        <p><img src="{{ block.image }}" alt="Embedded document image" loading="lazy"></p>
+      {% elif block.heading %}
+        <h2>{{ block.text }}</h2>
+      {% else %}
+        <p>{{ block.text }}</p>
+      {% endif %}
+    {% empty %}
+      <p>There is no readable text or supported image on this page.</p>
+    {% endfor %}
+    {% if images_omitted %}<p class="muted">Some images were too large or used an unsupported format.</p>{% endif %}
+  </section>
+{% endif %}
+{% endblock %}

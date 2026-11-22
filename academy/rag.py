@@ -5,9 +5,6 @@ import logging
 import math
 import re
 import time
-import os
-import shutil
-import tempfile
 
 import faiss
 import numpy as np
@@ -72,126 +69,166 @@ def clean_text(text):
 # ==========================================================
 
 def extract_document(resource, *, warnings=None):
-    """
-    Extract text from a document using Django's storage interface.
 
-    The file is copied to a temporary local path so that PyMuPDF,
-    python-docx, and python-pptx can process files stored locally
-    or in remote storage such as a private Supabase bucket.
-    """
+    path = resource.file.path
 
-    suffix = os.path.splitext(resource.file.name)[1].lower().lstrip(".")
+    suffix = path.lower().rsplit(".", 1)[-1]
+
     pages = []
 
-    if suffix not in ("pdf", "docx", "pptx"):
+
+    # ------------------------------------------------------
+    # PDF
+    # ------------------------------------------------------
+
+    if suffix == "pdf":
+        ocr = PdfOcr()
+
+        with pymupdf.open(path) as document:
+
+            if len(document) > 1000:
+
+                raise ValueError(
+                    "Limit PDF documents to 1,000 pages."
+                )
+
+            for page_number, page in enumerate(
+                document,
+                start=1
+            ):
+
+                text = clean_text(page.get_text())
+                if len(text) < 30 and page.get_images():
+                    recognized = clean_text(ocr.extract(page))
+                    if len(recognized) > len(text):
+                        text = recognized
+                pages.append((page_number, text))
+
+        if warnings is not None and ocr.warning:
+            warnings.append(ocr.warning)
+
+
+    # ------------------------------------------------------
+    # DOCX
+    # ------------------------------------------------------
+
+    elif suffix == "docx":
+
+        document = Document(path)
+
+        parts = []
+
+        for paragraph in document.paragraphs:
+
+            if paragraph.text.strip():
+
+                parts.append(
+                    paragraph.text
+                )
+
+        for table in document.tables:
+
+            for row in table.rows:
+
+                parts.append(
+                    " | ".join(
+                        cell.text
+                        for cell in row.cells
+                    )
+                )
+
+        text = clean_text(
+            "\n".join(parts)
+        )
+
+        pages.append(
+            (1, text)
+        )
+
+
+    # ------------------------------------------------------
+    # PPTX
+    # ------------------------------------------------------
+
+    elif suffix == "pptx":
+
+        presentation = Presentation(path)
+
+        if len(presentation.slides) > 1000:
+
+            raise ValueError(
+                "Limit presentations to 1,000 slides."
+            )
+
+        for slide_number, slide in enumerate(
+            presentation.slides,
+            start=1
+        ):
+
+            parts = []
+
+            for shape in slide.shapes:
+
+                if getattr(
+                    shape,
+                    "has_text_frame",
+                    False
+                ):
+
+                    for paragraph in shape.text_frame.paragraphs:
+
+                        if paragraph.text.strip():
+
+                            parts.append(
+                                paragraph.text
+                            )
+
+                if getattr(
+                    shape,
+                    "has_table",
+                    False
+                ):
+
+                    for row in shape.table.rows:
+
+                        parts.append(
+                            " | ".join(
+                                cell.text
+                                for cell in row.cells
+                            )
+                        )
+
+            text = clean_text(
+                "\n".join(parts)
+            )
+
+            pages.append(
+                (slide_number, text)
+            )
+
+
+    else:
+
         raise ValueError(
             "Unsupported document format. "
             "AI indexing supports PDF, DOCX and PPTX."
         )
 
-    # Copy the stored file into a temporary directory.
-    # The temporary copy is automatically removed afterwards.
-    with tempfile.TemporaryDirectory() as temp_dir:
-        path = os.path.join(temp_dir, f"document.{suffix}")
 
-        with resource.file.open("rb") as source_file:
-            with open(path, "wb") as destination_file:
-                shutil.copyfileobj(source_file, destination_file)
-
-        # ------------------------------------------------------
-        # PDF
-        # ------------------------------------------------------
-
-        if suffix == "pdf":
-            ocr = PdfOcr()
-
-            with pymupdf.open(path) as document:
-                if len(document) > 1000:
-                    raise ValueError(
-                        "Limit PDF documents to 1,000 pages."
-                    )
-
-                for page_number, page in enumerate(document, start=1):
-                    text = clean_text(page.get_text())
-
-                    if len(text) < 30 and page.get_images():
-                        recognized = clean_text(ocr.extract(page))
-                        if len(recognized) > len(text):
-                            text = recognized
-
-                    pages.append((page_number, text))
-
-            if warnings is not None and ocr.warning:
-                warnings.append(ocr.warning)
-
-        # ------------------------------------------------------
-        # DOCX
-        # ------------------------------------------------------
-
-        elif suffix == "docx":
-            document = Document(path)
-            parts = []
-
-            for paragraph in document.paragraphs:
-                if paragraph.text.strip():
-                    parts.append(paragraph.text)
-
-            for table in document.tables:
-                for row in table.rows:
-                    parts.append(
-                        " | ".join(cell.text for cell in row.cells)
-                    )
-
-            text = clean_text("\n".join(parts))
-            pages.append((1, text))
-
-        # ------------------------------------------------------
-        # PPTX
-        # ------------------------------------------------------
-
-        elif suffix == "pptx":
-            presentation = Presentation(path)
-
-            if len(presentation.slides) > 1000:
-                raise ValueError(
-                    "Limit presentations to 1,000 slides."
-                )
-
-            for slide_number, slide in enumerate(
-                presentation.slides,
-                start=1
-            ):
-                parts = []
-
-                for shape in slide.shapes:
-                    if getattr(shape, "has_text_frame", False):
-                        for paragraph in shape.text_frame.paragraphs:
-                            if paragraph.text.strip():
-                                parts.append(paragraph.text)
-
-                    if getattr(shape, "has_table", False):
-                        for row in shape.table.rows:
-                            parts.append(
-                                " | ".join(
-                                    cell.text for cell in row.cells
-                                )
-                            )
-
-                text = clean_text("\n".join(parts))
-                pages.append((slide_number, text))
-
-    # ------------------------------------------------------
-    # VALIDATE EXTRACTED CONTENT
-    # ------------------------------------------------------
-
-    total_characters = sum(len(text) for _, text in pages)
+    total_characters = sum(
+        len(text)
+        for _, text in pages
+    )
 
     if total_characters > 3_000_000:
+
         raise ValueError(
             "Extracted document text exceeds 3 million characters."
         )
 
     return pages
+
+
 # ==========================================================
 # DOCUMENT CHUNKING
 # ==========================================================

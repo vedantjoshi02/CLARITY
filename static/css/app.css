@@ -24,3 +24,7 @@
 
 /* Simplified year / semester subject management */
 .academic-selector{margin:24px 0}.academic-filter{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.academic-filter label{display:block;font-size:12px;font-weight:600;margin-bottom:8px}.academic-filter select{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}.academic-subject-row{display:flex;align-items:center;gap:16px;padding:20px 24px;border-bottom:1px solid var(--line)}.academic-subject-row:last-child{border-bottom:0}.subject-row-icon{width:42px;height:46px;display:grid;place-items:center;background:#eef1e5;border-radius:8px;font-size:22px;color:var(--green);flex-shrink:0}.academic-subject-info{flex:1;min-width:0}.academic-subject-info strong{display:block;font-size:14px}.academic-subject-info small{display:block;color:var(--muted);font-size:10px}.academic-subject-info p{font-size:11px;margin:5px 0}.academic-subject-row .actions{flex-shrink:0}.academic-subject-row .actions a{font-size:11px}.academic-subject-row .danger-link{color:#b94335}@media(max-width:600px){.academic-filter{grid-template-columns:1fr}.academic-subject-row{align-items:flex-start;padding:16px;gap:10px;flex-wrap:wrap}.academic-subject-info{min-width:calc(100% - 60px)}.academic-subject-row .actions{margin-left:52px}}
+
+.resource-pdf { width: 100%; height: 77vh; border: 1px solid #d4ddd8; border-radius: .75rem; }
+.office-preview img { max-width: 100%; height: auto; }
+.office-preview p, .office-preview td { white-space: pre-wrap; overflow-wrap: anywhere; }
